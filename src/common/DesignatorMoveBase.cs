@@ -13,6 +13,9 @@ using Verse.Sound;
 
 namespace MoveBase
 {
+    /// <summary>
+    /// Designator for Home Mover.
+    /// </summary>
     [StaticConstructorOnStartup]
     public class DesignatorMoveBase : Designator
     {
@@ -27,11 +30,24 @@ namespace MoveBase
         private static Mode _mode = Mode.Select;
         private static int _draggableDimension = 2;
 
+        /// <summary>
+        /// Gets or sets whether designation should be kept when the designator is deselected.
+        /// </summary>
         public bool KeepDesignation { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets a list of designated things.
+        /// </summary>
         public List<Thing> DesignatedThings { get; set; } = new List<Thing>();
 
+        /// <summary>
+        /// Dimension used by desigator when drag.
+        /// </summary>
         public override int DraggableDimensions => _draggableDimension;
 
+        /// <summary>
+        /// Gets the def for this designation.
+        /// </summary>
         protected override DesignationDef Designation => MoveBaseDefOf.MoveBase;
 
         enum Mode
@@ -47,19 +63,30 @@ namespace MoveBase
         {
             this.icon = _icon;
             this.useMouseIcon = true;
-            this.defaultDesc = "";
+            this.defaultDesc = UIText.Description.TranslateSimple();
+            this.defaultLabel = UIText.Label.TranslateSimple();
         }
 
+        /// <summary>
+        /// Clear cache of roof to remove.
+        /// </summary>
         public static void ClearCache()
         {
             _removeRoofModels.Clear();
         }
 
+        /// <summary>
+        /// Save state.
+        /// </summary>
         public static void ExposeData()
         {
             Scribe_Collections.Look(ref _removeRoofModels, nameof(_removeRoofModels), LookMode.Deep);
         }
 
+        /// <summary>
+        /// It should be invoked when a building is removed from designation.
+        /// </summary>
+        /// <param name="thing"> Building is being removed from designation. </param>
         public static void Notify_Removing_Callback(Thing thing)
         {
             if (!(thing is Building building) || !building.def.holdsRoof || !building.Spawned)
@@ -87,6 +114,10 @@ namespace MoveBase
             }
         }
 
+        /// <summary>
+        /// Add building to cache when a building is removed and being in transport/reinstallation by a pawn.
+        /// </summary>
+        /// <param name="building"> Building under transportation or reinstallation. </param>
         public static void AddBeingReinstalledBuilding(Building building)
         {
             if (building == null)
@@ -102,6 +133,11 @@ namespace MoveBase
             }
         }
 
+        /// <summary>
+        /// Get a list of building being reinstalled that are in the same designation group as <paramref name="building"/>.
+        /// </summary>
+        /// <param name="building"> Building in question. </param>
+        /// <returns> A list of buildings that are being reinstalled. </returns>
         public static HashSet<Building> GetBuildingsBeingReinstalled(Building building)
         {
             if (building == null)
@@ -118,6 +154,10 @@ namespace MoveBase
             return new HashSet<Building>();
         }
 
+        /// <summary>
+        /// Remove building from cache.
+        /// </summary>
+        /// <param name="building"> Building in question. </param>
         public static void RemoveBuildingFromCache(Building building)
         {
             if (building == null)
@@ -167,6 +207,11 @@ namespace MoveBase
                 return this.CanReinstallAllThings(loc);
         }
 
+        /// <summary>
+        /// Rotation control. Code copied from vanilla.
+        /// </summary>
+        /// <param name="leftX"> X position on screen. </param>
+        /// <param name="bottomY"> Bottom Y position on screen. </param>
         public override void DoExtraGuiControls(float leftX, float bottomY)
         {
             Rect winRect = new Rect(leftX, bottomY - 90f, 200f, 90f);
@@ -204,7 +249,9 @@ namespace MoveBase
             });
         }
 
-
+        /// <summary>
+        /// What should be drawn when the frame is being updated..
+        /// </summary>
         public override void SelectedUpdate()
         {
             GenDraw.DrawNoBuildEdgeLines();
@@ -214,6 +261,11 @@ namespace MoveBase
             this.DrawGhostMatrix();
         }
 
+        /// <summary>
+        /// Check if <paramref name="t"/> can be designated by this designator.
+        /// </summary>
+        /// <param name="t"> Thing in question. </param>
+        /// <returns> Returns true is <paramref name="t"/> can be designated. </returns>
         public override AcceptanceReport CanDesignateThing(Thing t)
         {
             if (_mode == Mode.Select)
@@ -260,8 +312,8 @@ namespace MoveBase
         {
             if (_mode == Mode.Select)
             {
-                Thing thing = TopReinstallableInCell(c);
-                if (thing != null)
+                List<Thing> things = this.ReinstallableInCell(c);
+                if (things.Any())
                 {
                     if (_originFound == false)
                     {
@@ -269,8 +321,8 @@ namespace MoveBase
                         _origin = c;
                     }
 
-                    DesignatedThings.Add(thing);
-                    DesignateThing(thing);
+                    DesignatedThings.AddRange(things);
+                    things.ForEach(thing => DesignateThing(thing));
                 }
             }
             else if (_mode == Mode.Place)
@@ -278,12 +330,13 @@ namespace MoveBase
                 IntVec3 mousePos = UI.MouseCell();
                 foreach (Thing thing in DesignatedThings)
                 {
-                    GenConstruct.PlaceBlueprintForReinstall((Building)thing, this.GetDeltaCell(thing, mousePos), thing.MapHeld, this.GetRotation(thing.Rotation), Faction.OfPlayer);
+                    GenConstruct.PlaceBlueprintForReinstall((Building)thing, this.GetDeltaCell(thing, mousePos), thing.MapHeld, this.GetRotation(thing), Faction.OfPlayer);
                 }
 
                 RemoveRoofIfCollapse(DesignatedThings.OfType<Building>(), DesignatedThings.First().MapHeld);
 
                 this.KeepDesignation = true;
+                _mode = Mode.Select;
                 Find.DesignatorManager.Deselect();
             }
         }
@@ -358,13 +411,28 @@ namespace MoveBase
             _draggableDimension = 0;
         }
 
+        private List<Thing> ReinstallableInCell(IntVec3 loc)
+        {
+            List<Thing> things = new List<Thing>();
+
+            foreach (Thing item in from t in base.Map.thingGrid.ThingsAt(loc)
+                                   orderby t.def.altitudeLayer descending
+                                   select t)
+            {
+                if (this.CanDesignateThing(item).Accepted)
+                    things.Add(item);
+            }
+
+            return things;
+        }
+
         private Thing TopReinstallableInCell(IntVec3 loc)
         {
             foreach (Thing item in from t in base.Map.thingGrid.ThingsAt(loc)
                                    orderby t.def.altitudeLayer descending
                                    select t)
             {
-                if (CanDesignateThing(item).Accepted)
+                if (this.CanDesignateThing(item).Accepted)
                 {
                     return item;
                 }
@@ -380,7 +448,7 @@ namespace MoveBase
                 mousePos
                 , (drawCell, thing) =>
                 {
-                    AcceptanceReport report = GenConstruct.CanPlaceBlueprintAt(thing.def, drawCell, this.GetRotation(thing.Rotation), thing.MapHeld, false, null, thing);
+                    AcceptanceReport report = GenConstruct.CanPlaceBlueprintAt(thing.def, drawCell, this.GetRotation(thing), thing.MapHeld, false, null, thing);
                     if (!report.Accepted)
                     {
                         result = report;
@@ -395,12 +463,15 @@ namespace MoveBase
 
         private AcceptanceReport CanReinstall(Thing thing, IntVec3 drawCell)
         {
-            return GenConstruct.CanPlaceBlueprintAt(thing.def, drawCell, this.GetRotation(thing.Rotation), thing.MapHeld, false, null, thing);
+            return GenConstruct.CanPlaceBlueprintAt(thing.def, drawCell, this.GetRotation(thing), thing.MapHeld, false, null, thing);
         }
 
-        private Rot4 GetRotation(Rot4 rot4)
+        private Rot4 GetRotation(Thing thing)
         {
-            return new Rot4(_rotation.AsInt + rot4.AsInt);
+            if (thing.def.rotatable)
+                return new Rot4(_rotation.AsInt + thing.Rotation.AsInt);
+            else
+                return thing.Rotation;
         }
 
         private IntVec3 GetDeltaCell(Thing thing, IntVec3 mousePos)
@@ -433,7 +504,7 @@ namespace MoveBase
         {
             Graphic baseGraphic = thing.Graphic.ExtractInnerGraphicFor(thing);
             Color color = this.CanReinstall(thing, cell).Accepted ? Designator_Place.CanPlaceColor : Designator_Place.CannotPlaceColor;
-            GhostDrawer.DrawGhostThing(cell, this.GetRotation(thing.Rotation), thing.def, baseGraphic, color, AltitudeLayer.Blueprint, thing);
+            GhostDrawer.DrawGhostThing(cell, this.GetRotation(thing), thing.def, baseGraphic, color, AltitudeLayer.Blueprint, thing);
         }
 
         private IntVec3 VectorRotation(IntVec3 cell, RotationDirection rotationDirection)

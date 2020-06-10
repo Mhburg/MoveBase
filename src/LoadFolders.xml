@@ -1,0 +1,12 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<!-- Forward slash is used to accomondate OS other than Windows. -->
+<loadFolders>
+    <default>
+        <li>Common</li>
+        <li>v1.1</li>
+    </default>
+    <v1.1>
+        <li>Common</li>
+        <li>v1.1</li>
+    </v1.1>
+</loadFolders>

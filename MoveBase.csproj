@@ -17,23 +17,28 @@
     <DebugSymbols>true</DebugSymbols>
     <DebugType>portable</DebugType>
     <Optimize>false</Optimize>
-    <OutputPath>G:\SteamLibrary\steamapps\common\RimWorld\Mods\MoveBase\Assemblies\</OutputPath>
+    <OutputPath>G:\SteamLibrary\steamapps\common\RimWorld\Mods\MoveBase\v1.1\Assemblies\</OutputPath>
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
-    <DocumentationFile>G:\SteamLibrary\steamapps\common\RimWorld\Mods\MoveBase\Assemblies\.xml</DocumentationFile>
+    <DocumentationFile>G:\SteamLibrary\steamapps\common\RimWorld\Mods\MoveBase\v1.1\Assemblies\MoveBase.xml</DocumentationFile>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>G:\SteamLibrary\steamapps\common\RimWorld\Mods\MoveBase\v1.1\Assemblies\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <DocumentationFile>G:\SteamLibrary\steamapps\common\RimWorld\Mods\MoveBase\v1.1\Assemblies\MoveBase.xml</DocumentationFile>
+  </PropertyGroup>
+  <PropertyGroup>
+    <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony, Version=2.0.0.10, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>packages\Lib.Harmony.2.0.0.10\lib\net472\0Harmony.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>G:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll</HintPath>
@@ -78,6 +83,7 @@
     <Compile Include="src\common\HarmonyPatches\Designator_Deselect_Patch.cs" />
     <Compile Include="src\common\HarmonyPatches\Designator_DesignateThing_Patch.cs" />
     <Compile Include="src\common\HarmonyPatches\RoofGrid_SetRoof_Patch.cs" />
+    <Compile Include="src\common\UIText.cs" />
     <Compile Include="src\common\util\HarmonyUtility.cs" />
     <Compile Include="src\common\MoveBaseDefOf.cs" />
     <Compile Include="src\common\util\RoofUtility.cs" />
@@ -87,6 +93,8 @@
   <ItemGroup>
     <Content Include="src\About\About.xml" />
     <Content Include="src\Defs\MoveBase.xml" />
+    <Content Include="src\Languages\English\Keyed\MoveBase.xml" />
+    <Content Include="src\LoadFolders.xml" />
     <Content Include="src\Patches\AddDesignator.xml" />
     <Content Include="src\Textures\UI\Designations\MoveBase.png" />
   </ItemGroup>
@@ -98,6 +106,7 @@
   <PropertyGroup>
     <PostBuildEvent>
             call "$(SolutionDir)SolutionItems\Deploy.bat" "$(ProjectDir)" "$(OutDir)" $(Configuration)
-            xcopy /i /e /d /y "$(SolutionDir)src\About" "$(OutDir)..\About"</PostBuildEvent>
+            xcopy /i /e /d /y "$(SolutionDir)src\About" "$(OutDir)..\..\About"
+ copy /d /y "$(SolutionDir)src\LoadFolders.xml" "$(OutDir)..\..\LoadFolders.xml"</PostBuildEvent>
   </PropertyGroup>
 </Project>

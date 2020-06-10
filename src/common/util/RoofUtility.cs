@@ -19,12 +19,13 @@ namespace MoveBase
         /// <param name="map"></param>
         /// <param name="exceptions"></param>
         /// <returns></returns>
+        /// <remarks>(141, 144) to (138, 138)</remarks>
         public static bool IsSupported(this IntVec3 roof, Map map, IEnumerable<Thing> exceptions)
         {
             bool supported = false;
             map.floodFiller.FloodFill(
                 roof
-                , (cell) => cell.InHorDistOf(roof, RoofCollapseUtility.RoofMaxSupportDistance)
+                , (cell) => (cell.Roofed(map) || cell == roof) && cell.InHorDistOf(roof, RoofCollapseUtility.RoofMaxSupportDistance)
                 , (cell) =>
                 {
                     if (!supported && cell.GetEdifice(map) is Building building && building.def.holdsRoof && !exceptions.Contains(building))

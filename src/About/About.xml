@@ -5,6 +5,7 @@
     <packageId>NotooShabby.HomeMover</packageId>
     <description>[v1.0.0]
 A simple mod that moves buildings around.
+It works better with "Minify Everything".
     </description>
     <url>https://github.com/Mhburg/AwsomeInventory</url>
     <supportedVersions>
@@ -20,6 +21,5 @@ A simple mod that moves buildings around.
     </modDependencies>
     <loadAfter>
         <li>brrainz.harmony</li>
-        <li>CETeam.CombatExtended</li>
     </loadAfter>
 </ModMetaData>
