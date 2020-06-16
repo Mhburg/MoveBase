@@ -36,8 +36,8 @@
     <SignAssembly>false</SignAssembly>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.0.0.10, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>packages\Lib.Harmony.2.0.0.10\lib\net472\0Harmony.dll</HintPath>
+    <Reference Include="0Harmony, Version=2.0.1.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>packages\Lib.Harmony.2.0.1\lib\net472\0Harmony.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Assembly-CSharp">
@@ -76,14 +76,22 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="src\common\Attributes\PerfProfile.cs" />
     <Compile Include="src\common\GameSaveComponent.cs" />
     <Compile Include="src\common\HarmonyPatches\Blueprint_Destroy_Patch.cs" />
     <Compile Include="src\common\HarmonyPatches\Designation_Notify_Removing_Patch.cs" />
     <Compile Include="src\common\DesignatorMoveBase.cs" />
     <Compile Include="src\common\HarmonyPatches\Designator_Deselect_Patch.cs" />
     <Compile Include="src\common\HarmonyPatches\Designator_DesignateThing_Patch.cs" />
+    <Compile Include="src\common\HarmonyPatches\GenConstruct_CanPlaceBlueprintAt_Patch.cs" />
+    <Compile Include="src\common\HarmonyPatches\JobDriver_Uninstall_FinishedRemoving_Patch.cs" />
+    <Compile Include="src\common\HarmonyPatches\MinifyUtility_MakeMinified.cs" />
     <Compile Include="src\common\HarmonyPatches\RoofGrid_SetRoof_Patch.cs" />
+    <Compile Include="src\common\MoveBaseMod.cs" />
+    <Compile Include="src\common\MoveBaseSetting.cs" />
     <Compile Include="src\common\UIText.cs" />
+    <Compile Include="src\common\UI\DrawUtility.cs" />
+    <Compile Include="src\common\UI\FeatureUpdateLetter.cs" />
     <Compile Include="src\common\util\HarmonyUtility.cs" />
     <Compile Include="src\common\MoveBaseDefOf.cs" />
     <Compile Include="src\common\util\RoofUtility.cs" />
@@ -92,15 +100,22 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="src\About\About.xml" />
+    <Content Include="src\Defs\Letter.xml" />
     <Content Include="src\Defs\MoveBase.xml" />
     <Content Include="src\Languages\English\Keyed\MoveBase.xml" />
     <Content Include="src\LoadFolders.xml" />
     <Content Include="src\Patches\AddDesignator.xml" />
     <Content Include="src\Textures\UI\Designations\MoveBase.png" />
   </ItemGroup>
-  <ItemGroup />
   <ItemGroup>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\RimWorldUtility\RimWorldUtility.csproj">
+      <Project>{5d54e978-4aec-45e5-86ee-4e30216a445e}</Project>
+      <Name>RimWorldUtility</Name>
+      <Private>False</Private>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

@@ -44,7 +44,7 @@ namespace MoveBase
                 {
                     bool canRemove = true;
                     HashSet<IntVec3> roofInRange = building.RoofInRange();
-                    IEnumerable<Building> buildingsBeingRemoved = DesignatorMoveBase.GetBuildingsBeingReinstalled(building).Concat(building);
+                    List<Building> buildingsBeingRemoved = DesignatorMoveBase.GetBuildingsBeingReinstalled(building).Concat(building).ToList();
                     foreach (IntVec3 roof in roofInRange)
                     {
                         if (!roof.IsSupported(building.MapHeld, buildingsBeingRemoved))

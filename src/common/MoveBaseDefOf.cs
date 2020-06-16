@@ -13,6 +13,8 @@ namespace MoveBase
     {
         public static DesignationDef MoveBase;
 
+        public static LetterDef NotooShabbyFeatureUpdate;
+
         static MoveBaseDefOf()
         {
             DefOfHelper.EnsureInitializedInCtor(typeof(MoveBaseDefOf));

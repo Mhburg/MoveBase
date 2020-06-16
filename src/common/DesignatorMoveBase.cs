@@ -9,6 +9,7 @@ using RimWorld;
 using RimWorld.Planet;
 using UnityEngine;
 using Verse;
+using Verse.AI;
 using Verse.Sound;
 
 namespace MoveBase
@@ -17,8 +18,11 @@ namespace MoveBase
     /// Designator for Home Mover.
     /// </summary>
     [StaticConstructorOnStartup]
+    [PerfProfile]
     public class DesignatorMoveBase : Designator
     {
+        private static readonly MethodInfo _setBuildingToReinstall = typeof(Blueprint_Install).GetMethod("SetBuildingToReinstall", BindingFlags.NonPublic | BindingFlags.Instance);
+
         private static Texture2D _icon = ContentFinder<Texture2D>.Get("UI/Designations/MoveBase");
 
         private static Rot4 _rotation = Rot4.North;
@@ -66,6 +70,36 @@ namespace MoveBase
             this.defaultDesc = UIText.Description.TranslateSimple();
             this.defaultLabel = UIText.Label.TranslateSimple();
         }
+
+        public static void PlaceWaitingBuildings()
+        {
+            GenConstruct_CanPlaceBlueprintAt_Patch.Mode = BlueprintMode.Place;
+            foreach (RemoveRoofModel model in _removeRoofModels)
+            {
+                foreach (Thing thing in model.WaitingThings.ToList())
+                {
+                    if (thing.DestroyedOrNull() || thing.MapHeld != model.Map)
+                    {
+                        model.WaitingThings.Remove(thing);
+                        continue;
+                    }
+
+                    IntVec3 deltaCell = GetDeltaCell(thing, model.MousePos, model.GhostPosition);
+
+                    Thing inner = thing.GetInnerIfMinified();
+                    if (GenConstruct.CanPlaceBlueprintAt(inner.def, deltaCell, inner.Rotate(model.Rotation), inner.MapHeld, thing: inner).Accepted)
+                    {
+                        if (thing is MinifiedThing minifiedThing)
+                            GenConstruct.PlaceBlueprintForInstall(minifiedThing, deltaCell, minifiedThing.MapHeld, inner.Rotate(model.Rotation), Faction.OfPlayer);
+                        else
+                            GenConstruct.PlaceBlueprintForReinstall(thing as Building, deltaCell, thing.MapHeld, thing.Rotate(model.Rotation), Faction.OfPlayer);
+
+                        model.WaitingThings.Remove(thing);
+                    }
+                }
+            }
+        }
+
 
         /// <summary>
         /// Clear cache of roof to remove.
@@ -190,21 +224,8 @@ namespace MoveBase
             _rotation = Rot4.North;
             _draggableDimension = 2;
             DesignatedThings.Clear();
-            _ghostPos.Clear();
+            _ghostPos = new Dictionary<Thing, IntVec3>();
             this.KeepDesignation = false;
-        }
-
-        /// <summary>
-        /// This method is invoked when either a click or a drag from mouse is performed.
-        /// </summary>
-        /// <param name="loc"> cell on map. </param>
-        /// <returns> Data model for acceptance. </returns>
-        public override AcceptanceReport CanDesignateCell(IntVec3 loc)
-        {
-            if (_mode == Mode.Select)
-                return this.CanDesignateThing(this.TopReinstallableInCell(loc));
-            else
-                return this.CanReinstallAllThings(loc);
         }
 
         /// <summary>
@@ -272,40 +293,46 @@ namespace MoveBase
             {
                 Building building = t as Building;
                 if (building == null)
-                {
                     return false;
-                }
+
                 if (building.def.category != ThingCategory.Building)
-                {
                     return false;
-                }
+
                 if (!building.def.Minifiable)
-                {
                     return false;
-                }
+
                 if (!DebugSettings.godMode && building.Faction != Faction.OfPlayer)
                 {
                     if (building.Faction != null)
-                    {
                         return false;
-                    }
+
                     if (!building.ClaimableBy(Faction.OfPlayer))
-                    {
                         return false;
-                    }
                 }
+
                 if (base.Map.designationManager.DesignationOn(t, Designation) != null)
-                {
                     return false;
-                }
+
                 if (base.Map.designationManager.DesignationOn(t, DesignationDefOf.Deconstruct) != null)
-                {
                     return false;
-                }
+
                 return true;
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// This method is invoked when either a click or a drag from mouse is performed.
+        /// </summary>
+        /// <param name="loc"> cell on map. </param>
+        /// <returns> Data model for acceptance. </returns>
+        public override AcceptanceReport CanDesignateCell(IntVec3 loc)
+        {
+            if (_mode == Mode.Select)
+                return this.CanDesignateThing(this.TopReinstallableInCell(loc));
+            else
+                return this.CanReinstallAllThings(loc);
         }
 
         public override void DesignateSingleCell(IntVec3 c)
@@ -327,13 +354,101 @@ namespace MoveBase
             }
             else if (_mode == Mode.Place)
             {
+                GenConstruct_CanPlaceBlueprintAt_Patch.Mode = BlueprintMode.Place;
+                HashSet<Thing> placedThings = new HashSet<Thing>();
+                Dictionary<Thing, Thing> twinThings = new Dictionary<Thing, Thing>();
+                Dictionary<Thing, Blueprint_Install> blueprintWork = new Dictionary<Thing, Blueprint_Install>();
+                Dictionary<Thing, IntVec3> siblingWork = new Dictionary<Thing, IntVec3>();
+
                 IntVec3 mousePos = UI.MouseCell();
-                foreach (Thing thing in DesignatedThings)
+                foreach (Thing designatedThing in DesignatedThings)
                 {
-                    GenConstruct.PlaceBlueprintForReinstall((Building)thing, this.GetDeltaCell(thing, mousePos), thing.MapHeld, this.GetRotation(thing), Faction.OfPlayer);
+                    IntVec3 drawCell = GetDeltaCell(designatedThing, mousePos, _ghostPos);
+                    List<Thing> things = drawCell.GetThingList(designatedThing.MapHeld);
+                    bool foundTwin = false;
+                    bool foundSibling = false;
+                    foreach (Thing thingOnCell in things)
+                    {
+                        if (DesignatedThings.Contains(thingOnCell))
+                        {
+                            if (designatedThing.IdenticalWith(_rotation, thingOnCell))
+                            {
+                                if (blueprintWork.TryGetValue(thingOnCell, out Blueprint_Install install))
+                                {
+                                    Thing twin = this.GetTailInTwinThings(twinThings, designatedThing);
+
+                                    _setBuildingToReinstall.Invoke(install, new[] { twin });
+                                    blueprintWork[twin] = install;
+                                    blueprintWork.Remove(thingOnCell);
+                                    placedThings.Add(twin);
+                                }
+                                else if (siblingWork.TryGetValue(thingOnCell, out IntVec3 position))
+                                {
+                                    Thing twin = this.GetTailInTwinThings(twinThings, designatedThing);
+                                    _ghostPos[twin] = position;
+                                    siblingWork.Remove(thingOnCell);
+                                    siblingWork[twin] = position;
+                                    placedThings.Add(thingOnCell);
+                                }
+                                else
+                                {
+                                    twinThings[thingOnCell] = designatedThing;
+                                    _ghostPos[designatedThing] = _ghostPos[thingOnCell];
+                                    placedThings.Add(thingOnCell);
+                                }
+
+                                this.Map.designationManager.TryRemoveDesignationOn(thingOnCell, MoveBaseDefOf.MoveBase);
+
+                                foundTwin = true;
+                                break;
+                            }
+                            else if (!GenConstruct.BlocksConstruction(designatedThing, thingOnCell))
+                            {
+                                continue;
+                            }
+                            else
+                            {
+                                foundSibling = true;
+                                Thing twin = this.GetTailInTwinThings(twinThings, designatedThing);
+                                siblingWork[twin] = _ghostPos[twin] = _ghostPos[designatedThing];
+                                break;
+                            }
+                        }
+                    }
+
+                    if (foundTwin || foundSibling)
+                        continue;
+
+                    Thing twin1 = this.GetTailInTwinThings(twinThings, designatedThing);
+
+
+                    AcceptanceReport report = GenConstruct.CanPlaceBlueprintAt(
+                        twin1.def
+                        , drawCell
+                        , this.GetRotation(twin1)
+                        , twin1.MapHeld
+                        , false
+                        , null
+                        , twin1);
+
+                    if (report.Accepted)
+                    {
+                        Building building = twin1 as Building;
+                        blueprintWork[building] = GenConstruct.PlaceBlueprintForReinstall(building, drawCell, building.MapHeld, this.GetRotation(building), Faction.OfPlayer);
+                        placedThings.Add(building);
+                    }
                 }
 
-                RemoveRoofIfCollapse(DesignatedThings.OfType<Building>(), DesignatedThings.First().MapHeld);
+                RemoveRoofModel model =
+                    InitModel(
+                        DesignatedThings
+                        , DesignatedThings.Except(placedThings).ToList()
+                        , DesignatedThings.First().MapHeld
+                        , mousePos
+                        , _rotation
+                        , _ghostPos);
+
+                ResolveDeadLock(model);
 
                 this.KeepDesignation = true;
                 _mode = Mode.Select;
@@ -402,6 +517,20 @@ namespace MoveBase
                 .Add(roof);
         }
 
+        public static void UninstallJobCallback(Building building, Map map)
+        {
+            foreach (RemoveRoofModel model in _removeRoofModels)
+            {
+                if (model.WaitingThings.Contains(building))
+                {
+                    MinifiedThing minifiedThing = (MinifiedThing)map.listerThings.ThingsInGroup(ThingRequestGroup.MinifiedThing).FirstOrDefault(t => t.GetInnerIfMinified() == building);
+                    model.GhostPosition[minifiedThing] = model.GhostPosition[building];
+                    model.WaitingThings.Remove(building);
+                    model.WaitingThings.Add(minifiedThing);
+                }
+            }
+        }
+
         /// <summary>
         /// This method is invoked when at least one thing is selected by this selector.
         /// </summary>
@@ -409,6 +538,54 @@ namespace MoveBase
         {
             _mode = Mode.Place;
             _draggableDimension = 0;
+        }
+
+        private static void ResolveDeadLock(RemoveRoofModel model)
+        {
+            foreach (Thing thing in model.WaitingThings.ToList())
+            {
+                Thing lastFound = thing;
+                List<Thing> foundThings = new List<Thing>() { lastFound };
+
+                while (true)
+                {
+                    IntVec3 spawnCell = GetDeltaCell(lastFound, model.MousePos, model.GhostPosition);
+                    List<IntVec3> rect = GenAdj.OccupiedRect(spawnCell, lastFound.Rotate(model.Rotation), lastFound.def.size).ToList();
+                    if (lastFound.def.hasInteractionCell)
+                    {
+                        rect.Add(Verse.ThingUtility.InteractionCellWhenAt(lastFound.def, spawnCell, lastFound.Rotate(model.Rotation), lastFound.MapHeld));
+                    }
+                    IEnumerable<Thing> thingsOnCell = rect.SelectMany(c => c.GetThingList(lastFound.MapHeld).Where(t => t.def.blueprintDef != null && t.def.Minifiable));
+                    lastFound = thingsOnCell.FirstOrDefault(t => GenConstruct.BlocksConstruction(lastFound, t) && model.WaitingThings.Contains(t))
+                        ?? ThingUtility.BlockAdjacentInteractionCell(lastFound, spawnCell, lastFound.Rotate(model.Rotation));
+                    if (lastFound == null || foundThings.Contains(lastFound))
+                        break;
+
+                    foundThings.Add(lastFound);
+                }
+
+                if (lastFound == null)
+                {
+                    continue;
+                }
+                else
+                {
+                    thing.Map.designationManager.AddDesignation(new Designation(thing, DesignationDefOf.Uninstall));
+                }
+            }
+        }
+
+        private Thing GetTailInTwinThings(Dictionary<Thing, Thing> table, Thing thing)
+        {
+            while (table.TryGetValue(thing, out Thing tail))
+                thing = tail;
+
+            return thing;
+        }
+
+        private static IntVec3 GetDeltaCell(Thing thing, IntVec3 mousePos, Dictionary<Thing, IntVec3> ghostPos)
+        {
+            return new IntVec3(mousePos.x + ghostPos[thing].x, mousePos.y, mousePos.z + ghostPos[thing].z);
         }
 
         private List<Thing> ReinstallableInCell(IntVec3 loc)
@@ -444,11 +621,19 @@ namespace MoveBase
         private AcceptanceReport CanReinstallAllThings(IntVec3 mousePos)
         {
             AcceptanceReport result = AcceptanceReport.WasAccepted;
+            GenConstruct_CanPlaceBlueprintAt_Patch.Mode = BlueprintMode.Check;
             this.TraverseDesignateThings(
                 mousePos
                 , (drawCell, thing) =>
                 {
-                    AcceptanceReport report = GenConstruct.CanPlaceBlueprintAt(thing.def, drawCell, this.GetRotation(thing), thing.MapHeld, false, null, thing);
+                    AcceptanceReport report = GenConstruct.CanPlaceBlueprintAt(
+                        thing.def
+                        , drawCell
+                        , this.GetRotation(thing)
+                        , thing.MapHeld
+                        , false
+                        , null
+                        , thing);
                     if (!report.Accepted)
                     {
                         result = report;
@@ -463,7 +648,10 @@ namespace MoveBase
 
         private AcceptanceReport CanReinstall(Thing thing, IntVec3 drawCell)
         {
-            return GenConstruct.CanPlaceBlueprintAt(thing.def, drawCell, this.GetRotation(thing), thing.MapHeld, false, null, thing);
+            GenConstruct_CanPlaceBlueprintAt_Patch.Mode = BlueprintMode.Check;
+            AcceptanceReport report = GenConstruct.CanPlaceBlueprintAt(thing.def, drawCell, this.GetRotation(thing), thing.MapHeld, false, null, thing);
+
+            return report;
         }
 
         private Rot4 GetRotation(Thing thing)
@@ -472,11 +660,6 @@ namespace MoveBase
                 return new Rot4(_rotation.AsInt + thing.Rotation.AsInt);
             else
                 return thing.Rotation;
-        }
-
-        private IntVec3 GetDeltaCell(Thing thing, IntVec3 mousePos)
-        {
-            return new IntVec3(mousePos.x + _ghostPos[thing].x, mousePos.y, mousePos.z + _ghostPos[thing].z);
         }
 
         private void DrawGhostMatrix()
@@ -495,7 +678,7 @@ namespace MoveBase
         {
             foreach (Thing thing in DesignatedThings)
             {
-                if (func(this.GetDeltaCell(thing, mousePos), thing))
+                if (func(GetDeltaCell(thing, mousePos, _ghostPos), thing))
                     break;
             }
         }
@@ -544,50 +727,42 @@ namespace MoveBase
         }
 
 
-        private static void RemoveRoofIfCollapse(IEnumerable<Building> buildings, Map map)
+        private static RemoveRoofModel InitModel(List<Thing> designatedThings, List<Thing> waitingThings, Map map, IntVec3 mousePos, Rot4 rotation, Dictionary<Thing, IntVec3> ghostPos)
         {
-            //HashSet<IntVec3> roofInRange = new HashSet<IntVec3>();
-            //foreach (Building building in buildings)
-            //{
-            //    roofInRange.AddRange(building.RoofInRange());
-            //}
-
-            List<IntVec3> roofToRemove = new List<IntVec3>();
-            _removeRoofModels.Add(new RemoveRoofModel(buildings.Where(b => b.def.holdsRoof).ToHashSet(), roofToRemove.ToHashSet(), map));
-            //foreach (IntVec3 roof in roofInRange)
-            //{
-            //    bool supported = false;
-            //    map.floodFiller.FloodFill(
-            //        roof
-            //        , (cell) => !supported && cell.InBounds(map) && cell.InHorDistOf(roof, RoofCollapseUtility.RoofMaxSupportDistance)
-            //        , (cell) =>
-            //        {
-            //            if (cell.GetEdifice(map) is Building building && !things.Contains(building) && building.def.holdsRoof)
-            //                supported = true;
-            //        });
-
-            //    if (!supported)
-            //        roofToRemove.Add(roof);
-            //}
-
-            //if (roofToRemove.Any())
-            //{
-            //    _removeRoofModels.Add(new RemoveRoofModel(things.ToList(), roofToRemove.ToList(), map));
-            //    foreach (IntVec3 cell in roofToRemove)
-            //    {
-            //        map.areaManager.NoRoof[cell] = true;
-            //        map.areaManager.BuildRoof[cell] = false;
-            //    }
-            //}
+            RemoveRoofModel newModel = new RemoveRoofModel(
+                designatedThings
+                , designatedThings.OfType<Building>().Where(b => b.def.holdsRoof).ToHashSet()
+                , waitingThings
+                , new HashSet<IntVec3>()
+                , map
+                , mousePos
+                , rotation
+                , ghostPos);
+            _removeRoofModels.Add(newModel);
+            return newModel;
         }
 
         private class RemoveRoofModel : IExposable
         {
+
+            private List<Thing> ghostThings = new List<Thing>();
+            private List<IntVec3> ghostPos = new List<IntVec3>();
+
             public HashSet<Building> BuildingsToReinstall;
 
             public HashSet<Building> BuildingsBeingReinstalled;
 
+            public List<Thing> DesignatedThings;
+
+            public HashSet<Thing> WaitingThings;
+
             public HashSet<IntVec3> RoofToRemove;
+
+            public Dictionary<Thing, IntVec3> GhostPosition;
+
+            public IntVec3 MousePos;
+
+            public Rot4 Rotation;
 
             public Map Map;
 
@@ -595,12 +770,17 @@ namespace MoveBase
             {
             }
 
-            public RemoveRoofModel(HashSet<Building> buildingsToReinstall, HashSet<IntVec3> roofToRemove, Map map)
+            public RemoveRoofModel(List<Thing> designatedThings, HashSet<Building> roofSupporterToReinstall, IEnumerable<Thing> waitingThings, HashSet<IntVec3> roofToRemove, Map map, IntVec3 mousePos, Rot4 rotation, Dictionary<Thing, IntVec3> ghostPos)
             {
-                this.BuildingsToReinstall = buildingsToReinstall;
+                this.DesignatedThings = designatedThings;
+                this.BuildingsToReinstall = roofSupporterToReinstall;
                 this.RoofToRemove = roofToRemove;
                 this.Map = map;
                 this.BuildingsBeingReinstalled = new HashSet<Building>();
+                this.WaitingThings = waitingThings.ToHashSet();
+                this.MousePos = mousePos;
+                this.Rotation = rotation;
+                this.GhostPosition = ghostPos;
             }
 
             public void ExposeData()
@@ -608,7 +788,14 @@ namespace MoveBase
                 Scribe_Collections.Look(ref this.BuildingsToReinstall, nameof(this.BuildingsToReinstall), LookMode.Reference);
                 Scribe_Collections.Look(ref this.BuildingsBeingReinstalled, nameof(this.BuildingsBeingReinstalled), LookMode.Reference);
                 Scribe_Collections.Look(ref this.RoofToRemove, nameof(RoofToRemove), LookMode.Value);
+                Scribe_Collections.Look(ref this.DesignatedThings, nameof(this.DesignatedThings), LookMode.Reference);
+                Scribe_Collections.Look(ref this.WaitingThings, nameof(this.WaitingThings), LookMode.Reference);
                 Scribe_References.Look(ref this.Map, nameof(this.Map));
+                Scribe_Values.Look(ref this.MousePos, nameof(this.MousePos));
+                Scribe_Values.Look(ref this.Rotation, nameof(this.Rotation));
+
+
+                Scribe_Collections.Look(ref this.GhostPosition, nameof(this.GhostPosition), LookMode.Reference, LookMode.Value, ref ghostThings, ref ghostPos);
             }
         }
     }
