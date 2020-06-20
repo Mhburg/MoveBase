@@ -24,10 +24,8 @@ namespace MoveBase
 
         static PerfProfile()
         {
-#if DEBUG
             if (!_initialized)
                 Init();
-#endif
         }
 
         public static void Init()
@@ -46,15 +44,14 @@ namespace MoveBase
             _initialized = true;
         }
 
+        [Conditional("DEBUG")]
         public static void OutputLog()
         {
-#if DEBUG
             StringBuilder stringBuilder = new StringBuilder();
             foreach (var pair in _totalTime.OrderByDescending(pair => pair.Value.TotalTime))
                 stringBuilder.AppendLine($"{pair.Key}: {pair.Value}");
 
             Log.Warning(stringBuilder.ToString(), true);
-#endif
         }
 
         private static bool Prefix(MethodBase __originalMethod)

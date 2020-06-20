@@ -15,7 +15,6 @@ namespace MoveBase
     /// Patch CanPlaceBlueprint so players can move buildings to positions where are occupied by other buildings that are also desiganted.
     /// </summary>
     [StaticConstructorOnStartup]
-    [HarmonyDebug]
     public static class GenConstruct_CanPlaceBlueprintAt_Patch
     {
         private static PropertyInfo _designatorDef = typeof(Designator).GetProperty("DesignationDef ", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -107,7 +106,6 @@ namespace MoveBase
         /// </summary>
         /// <param name="codeInstructions"></param>
         /// <returns> Sequence of IL after patched. </returns>
-        [HarmonyDebug]
         public static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> codeInstructions)
         {
             List<CodeInstruction> instructions = codeInstructions.ToList();
