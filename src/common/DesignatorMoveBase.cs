@@ -261,7 +261,7 @@ namespace MoveBase
                 {
                     foreach (Thing thing in DesignatedThings)
                     {
-                        _ghostPos[thing] = this.VectorRotation(_ghostPos[thing], rotationDirection);
+                        _ghostPos[thing] = this.VectorRotation(_ghostPos[thing], rotationDirection, thing);
                     }
                     _rotation.Rotate(rotationDirection);
                 }
@@ -425,7 +425,7 @@ namespace MoveBase
                     AcceptanceReport report = GenConstruct.CanPlaceBlueprintAt(
                         twin1.def
                         , drawCell
-                        , this.GetRotation(twin1)
+                        , GetRotation(twin1)
                         , twin1.MapHeld
                         , false
                         , null
@@ -434,7 +434,7 @@ namespace MoveBase
                     if (report.Accepted)
                     {
                         Building building = twin1 as Building;
-                        blueprintWork[building] = GenConstruct.PlaceBlueprintForReinstall(building, drawCell, building.MapHeld, this.GetRotation(building), Faction.OfPlayer);
+                        blueprintWork[building] = GenConstruct.PlaceBlueprintForReinstall(building, drawCell, building.MapHeld, GetRotation(building), Faction.OfPlayer);
                         placedThings.Add(building);
                     }
                 }
@@ -629,7 +629,7 @@ namespace MoveBase
                     AcceptanceReport report = GenConstruct.CanPlaceBlueprintAt(
                         thing.def
                         , drawCell
-                        , this.GetRotation(thing)
+                        , GetRotation(thing)
                         , thing.MapHeld
                         , false
                         , null
@@ -649,12 +649,12 @@ namespace MoveBase
         private AcceptanceReport CanReinstall(Thing thing, IntVec3 drawCell)
         {
             GenConstruct_CanPlaceBlueprintAt_Patch.Mode = BlueprintMode.Check;
-            AcceptanceReport report = GenConstruct.CanPlaceBlueprintAt(thing.def, drawCell, this.GetRotation(thing), thing.MapHeld, false, null, thing);
+            AcceptanceReport report = GenConstruct.CanPlaceBlueprintAt(thing.def, drawCell, GetRotation(thing), thing.MapHeld, false, null, thing);
 
             return report;
         }
 
-        private Rot4 GetRotation(Thing thing)
+        private static Rot4 GetRotation(Thing thing)
         {
             if (thing.def.rotatable)
                 return new Rot4(_rotation.AsInt + thing.Rotation.AsInt);
@@ -687,19 +687,62 @@ namespace MoveBase
         {
             Graphic baseGraphic = thing.Graphic.ExtractInnerGraphicFor(thing);
             Color color = this.CanReinstall(thing, cell).Accepted ? Designator_Place.CanPlaceColor : Designator_Place.CannotPlaceColor;
-            GhostDrawer.DrawGhostThing(cell, this.GetRotation(thing), thing.def, baseGraphic, color, AltitudeLayer.Blueprint, thing);
+            GhostDrawer.DrawGhostThing(cell, GetRotation(thing), thing.def, baseGraphic, color, AltitudeLayer.Blueprint, thing);
         }
 
-        private IntVec3 VectorRotation(IntVec3 cell, RotationDirection rotationDirection)
+        private IntVec3 VectorRotation(IntVec3 cell, RotationDirection rotationDirection, Thing thing)
         {
-            switch (rotationDirection)
+            if (thing.def.rotatable || thing.def.size == IntVec2.One)
             {
-                case RotationDirection.Clockwise:
-                    return new IntVec3(cell.z, cell.y, -cell.x);
-                case RotationDirection.Counterclockwise:
-                    return new IntVec3(-cell.z, cell.y, cell.x);
-                default:
-                    return cell;
+                return Rotate(cell);
+            }
+            else
+            {
+                Log.Message($"Position: {cell}");
+                IEnumerable<IntVec3> corners = thing.OccupiedRect()
+                                                    .Corners
+                                                    .Select(corner =>
+                                                    {
+                                                        IntVec3 normalized = corner - thing.Position + cell;
+                                                        Log.Message($"Normalized: {normalized}");
+                                                        return normalized;
+                                                    })
+                                                    .Select(Rotate);
+
+                var value = GetCenter(corners.ToList());
+                Log.Message($"Return value: {value}");
+                return value;
+            }
+
+            IntVec3 Rotate(IntVec3 pos)
+            {
+                switch (rotationDirection)
+                {
+                    case RotationDirection.Clockwise:
+                        return new IntVec3(pos.z, pos.y, -pos.x);
+                    case RotationDirection.Counterclockwise:
+                        return new IntVec3(-pos.z, pos.y, pos.x);
+                    default:
+                        return pos;
+                }
+            }
+
+            IntVec3 GetCenter(List<IntVec3> cells)
+            {
+                int minX, minZ, maxX, maxZ;
+                maxX = maxZ = int.MinValue;
+                minX = minZ = int.MaxValue;
+
+                foreach (IntVec3 c in cells)
+                {
+                    Log.Message($"Rotated: {c}");
+                    minX = c.x < minX ? c.x : minX;
+                    minZ = c.z < minZ ? c.z : minZ;
+                    maxX = c.x > maxX ? c.x : maxX;
+                    maxZ = c.z > maxZ ? c.z : maxZ;
+                }
+
+                return new IntVec3((maxX - minX) / 2 + minX, cells[0].y, (maxZ - minZ) / 2 + minZ);
             }
         }
 
@@ -719,7 +762,7 @@ namespace MoveBase
             {
                 foreach (Thing thing in DesignatedThings)
                 {
-                    _ghostPos[thing] = this.VectorRotation(_ghostPos[thing], rotationDirection);
+                    _ghostPos[thing] = this.VectorRotation(_ghostPos[thing], rotationDirection, thing);
                 }
                 _rotation.Rotate(rotationDirection);
                 SoundDefOf.DragSlider.PlayOneShotOnCamera();
