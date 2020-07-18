@@ -114,6 +114,7 @@ namespace MoveBase
         /// </summary>
         public static void ExposeData()
         {
+            RemoveEmptyCache();
             Scribe_Collections.Look(ref _removeRoofModels, nameof(_removeRoofModels), LookMode.Deep);
         }
 
@@ -495,7 +496,7 @@ namespace MoveBase
         {
             foreach (RemoveRoofModel model in _removeRoofModels)
             {
-                if (model.RoofToRemove.Contains(cell))
+                if (model.RoofToRemove?.Contains(cell) ?? false)
                 {
                     model.Map.areaManager.NoRoof[cell] = false;
                     model.RoofToRemove.Remove(cell);
@@ -586,6 +587,17 @@ namespace MoveBase
         private static IntVec3 GetDeltaCell(Thing thing, IntVec3 mousePos, Dictionary<Thing, IntVec3> ghostPos)
         {
             return new IntVec3(mousePos.x + ghostPos[thing].x, mousePos.y, mousePos.z + ghostPos[thing].z);
+        }
+
+        private static void RemoveEmptyCache()
+        {
+            foreach (RemoveRoofModel model in _removeRoofModels.ToList())
+            {
+                if (!model.BuildingsToReinstall.Any() && !model.RoofToRemove.Any())
+                {
+                    _removeRoofModels.Remove(model);
+                }
+            }
         }
 
         private List<Thing> ReinstallableInCell(IntVec3 loc)
@@ -687,7 +699,15 @@ namespace MoveBase
         {
             Graphic baseGraphic = thing.Graphic.ExtractInnerGraphicFor(thing);
             Color color = this.CanReinstall(thing, cell).Accepted ? Designator_Place.CanPlaceColor : Designator_Place.CannotPlaceColor;
-            GhostDrawer.DrawGhostThing(cell, GetRotation(thing), thing.def, baseGraphic, color, AltitudeLayer.Blueprint, thing);
+            try
+            {
+                GhostDrawer.DrawGhostThing(cell, GetRotation(thing), thing.def, baseGraphic, color,
+                    AltitudeLayer.Blueprint, thing);
+            }
+            catch
+            {
+                // no op.
+            }
         }
 
         private IntVec3 VectorRotation(IntVec3 cell, RotationDirection rotationDirection, Thing thing)
@@ -785,23 +805,25 @@ namespace MoveBase
             return newModel;
         }
 
+
+
         private class RemoveRoofModel : IExposable
         {
 
             private List<Thing> ghostThings = new List<Thing>();
             private List<IntVec3> ghostPos = new List<IntVec3>();
 
-            public HashSet<Building> BuildingsToReinstall;
+            public HashSet<Building> BuildingsToReinstall = new HashSet<Building>();
 
-            public HashSet<Building> BuildingsBeingReinstalled;
+            public HashSet<Building> BuildingsBeingReinstalled = new HashSet<Building>();
 
-            public List<Thing> DesignatedThings;
+            public List<Thing> DesignatedThings = new List<Thing>();
 
-            public HashSet<Thing> WaitingThings;
+            public HashSet<Thing> WaitingThings = new HashSet<Thing>();
 
-            public HashSet<IntVec3> RoofToRemove;
+            public HashSet<IntVec3> RoofToRemove = new HashSet<IntVec3>();
 
-            public Dictionary<Thing, IntVec3> GhostPosition;
+            public Dictionary<Thing, IntVec3> GhostPosition = new Dictionary<Thing, IntVec3>();
 
             public IntVec3 MousePos;
 
@@ -828,6 +850,11 @@ namespace MoveBase
 
             public void ExposeData()
             {
+                if (Scribe.mode == LoadSaveMode.Saving)
+                {
+                    this.CleanCache();
+                }
+
                 Scribe_Collections.Look(ref this.BuildingsToReinstall, nameof(this.BuildingsToReinstall), LookMode.Reference);
                 Scribe_Collections.Look(ref this.BuildingsBeingReinstalled, nameof(this.BuildingsBeingReinstalled), LookMode.Reference);
                 Scribe_Collections.Look(ref this.RoofToRemove, nameof(RoofToRemove), LookMode.Value);
@@ -839,6 +866,36 @@ namespace MoveBase
 
 
                 Scribe_Collections.Look(ref this.GhostPosition, nameof(this.GhostPosition), LookMode.Reference, LookMode.Value, ref ghostThings, ref ghostPos);
+            }
+
+            private void CleanCache()
+            {
+                RemoveDestroyedThings(this.DesignatedThings);
+                RemoveDestroyedThings(this.BuildingsBeingReinstalled);
+                RemoveDestroyedThings(this.BuildingsToReinstall);
+                RemoveDestroyedThings(this.WaitingThings);
+
+                if (this.GhostPosition is null)
+                    return;
+
+                foreach (Thing key in this.GhostPosition.Keys)
+                {
+                    if (key.Destroyed)
+                    {
+                        this.GhostPosition.Remove(key);
+                    }
+                }
+            }
+
+            private static void RemoveDestroyedThings<T>(ICollection<T> things) where T : Thing
+            {
+                foreach (T thing in new List<T>(things))
+                {
+                    if (thing.Destroyed)
+                    {
+                        things.Remove(thing);
+                    }
+                }
             }
         }
     }

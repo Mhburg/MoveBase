@@ -8,6 +8,7 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "SolutionItems", "SolutionItems", "{D1B3ACA6-F0CD-4CBE-8D1B-6E1DD6E46E71}"
 	ProjectSection(SolutionItems) = preProject
 		SolutionItems\Deploy.bat = SolutionItems\Deploy.bat
+		Directory.Build.targets = Directory.Build.targets
 	EndProjectSection
 EndProject
 Project("{911E67C6-3D85-4FCE-B560-20A9C3E3FF48}") = "RimWorldWin64", "G:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64.exe", "{923566DE-2349-46F6-89D3-55199CF49AB0}"
