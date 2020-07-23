@@ -22,7 +22,7 @@ namespace MoveBase
 
         public static void Postfix(IntVec3 c, RoofDef def)
         {
-            if (def == null)
+            if (def == null && Current.ProgramState == ProgramState.Playing)
                 DesignatorMoveBase.SetNoRoofFalse(c);
         }
     }

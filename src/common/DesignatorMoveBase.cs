@@ -114,8 +114,11 @@ namespace MoveBase
         /// </summary>
         public static void ExposeData()
         {
-            RemoveEmptyCache();
+            if (Scribe.mode == LoadSaveMode.Saving)
+                RemoveEmptyCache();
+
             Scribe_Collections.Look(ref _removeRoofModels, nameof(_removeRoofModels), LookMode.Deep);
+            _removeRoofModels = _removeRoofModels ?? new List<RemoveRoofModel>();
         }
 
         /// <summary>
@@ -593,7 +596,7 @@ namespace MoveBase
         {
             foreach (RemoveRoofModel model in _removeRoofModels.ToList())
             {
-                if (!model.BuildingsToReinstall.Any() && !model.RoofToRemove.Any())
+                if (!model.BuildingsToReinstall.EnumerableNullOrEmpty() && !model.RoofToRemove.EnumerableNullOrEmpty())
                 {
                     _removeRoofModels.Remove(model);
                 }
@@ -878,7 +881,7 @@ namespace MoveBase
                 if (this.GhostPosition is null)
                     return;
 
-                foreach (Thing key in this.GhostPosition.Keys)
+                foreach (Thing key in this.GhostPosition.Keys.ToList())
                 {
                     if (key.Destroyed)
                     {

@@ -14,20 +14,20 @@ namespace MoveBase
 
         public MoveBaseSetting()
         {
-            FeatureNews news = new FeatureNews(
-                        "Home Mover update"
-                        , $"Now, Home Mover allows you to move buildings to positions that are occupied, in a different formation, by the same buildings."
-                        , @"https://steamcommunity.com/sharedfiles/filedetails/?id=2092552843"
-                        , "Check out the demo"
-                        , new DateTime(2020, 6, 15));
+            //FeatureNews news = new FeatureNews(
+            //            "Home Mover update"
+            //            , $"Now, Home Mover allows you to move buildings to positions that are occupied, in a different formation, by the same buildings."
+            //            , @"https://steamcommunity.com/sharedfiles/filedetails/?id=2092552843"
+            //            , "Check out the demo"
+            //            , new DateTime(2020, 6, 15));
 
-            FeatureNews.Add(news);
+            //FeatureNews.Add(news);
         }
 
         public override void ExposeData()
         {
-            base.ExposeData();
-            Scribe_Collections.Look(ref FeatureNews, nameof(FeatureNews), LookMode.Deep);
+            //base.ExposeData();
+            //Scribe_Collections.Look(ref FeatureNews, nameof(FeatureNews), LookMode.Deep);
         }
     }
 }
