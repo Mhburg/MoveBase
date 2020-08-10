@@ -892,6 +892,9 @@ namespace MoveBase
 
             private static void RemoveDestroyedThings<T>(ICollection<T> things) where T : Thing
             {
+                if (things.EnumerableNullOrEmpty())
+                    return;
+
                 foreach (T thing in new List<T>(things))
                 {
                     if (thing.Destroyed)
