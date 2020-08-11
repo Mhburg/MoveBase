@@ -1,0 +1,14 @@
+﻿name: Publish latest build on Github
+on: push
+
+jobs:
+  setup:
+    name: Build solution
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.0.1
+        with:
+          vs-version: '[16.6,]'
