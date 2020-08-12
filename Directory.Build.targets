@@ -9,6 +9,11 @@
             SkipUnchangedFiles="true" />
 
         <Copy
+            SourceFiles="D:\Modding\RimWorldUtility\bin\Release\NotooShabby.RimWorldUtility.dll"
+            DestinationFiles="D:\Modding\MoveBase\references\NotooShabby.RimWorldUtility.dll"
+            SkipUnchangedFiles="true" />
+
+        <Copy
             SourceFiles="G:\SteamLibrary\steamapps\common\RimWorld\RimWorldWin64_Data\Managed\Assembly-CSharp.dll"
             DestinationFiles="D:\Modding\MoveBase\references\Assembly-CSharp.dll"
             SkipUnchangedFiles="true" />
