@@ -25,7 +25,6 @@ jobs:
       - name: Pack mod
         run: |
           powershell .\.github\workflows\packMod.ps1 -ModDir .\HomeMover -Src .\src
-          Get-ChildItem -Recurse
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2
