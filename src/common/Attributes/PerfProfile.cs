@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -12,13 +12,13 @@ namespace MoveBase
 {
     public class PerfProfile : Attribute
     {
-        private static Dictionary<MethodBase, Stopwatch> _watches = new Dictionary<MethodBase, Stopwatch>();
+        private static readonly Dictionary<MethodBase, Stopwatch> _watches = new Dictionary<MethodBase, Stopwatch>();
 
-        private static Dictionary<MethodBase, StatModel> _totalTime = new Dictionary<MethodBase, StatModel>();
+        private static readonly Dictionary<MethodBase, StatModel> _totalTime = new Dictionary<MethodBase, StatModel>();
 
-        private static MethodInfo _prefix = typeof(PerfProfile).GetMethod(nameof(PerfProfile.Prefix), BindingFlags.Static | BindingFlags.NonPublic);
+        private static readonly MethodInfo _prefix = typeof(PerfProfile).GetMethod(nameof(PerfProfile.Prefix), BindingFlags.Static | BindingFlags.NonPublic);
 
-        private static MethodInfo _postfix = typeof(PerfProfile).GetMethod(nameof(PerfProfile.Postfix), BindingFlags.Static | BindingFlags.NonPublic);
+        private static readonly MethodInfo _postfix = typeof(PerfProfile).GetMethod(nameof(PerfProfile.Postfix), BindingFlags.Static | BindingFlags.NonPublic);
 
         private static bool _initialized = false;
 
@@ -51,7 +51,7 @@ namespace MoveBase
             foreach (var pair in _totalTime.OrderByDescending(pair => pair.Value.TotalTime))
                 stringBuilder.AppendLine($"{pair.Key}: {pair.Value}");
 
-            Log.Warning(stringBuilder.ToString(), true);
+            Log.Warning(stringBuilder.ToString());
         }
 
         private static bool Prefix(MethodBase __originalMethod)
