@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,9 +12,9 @@ namespace MoveBase
 {
     public class FeatureUpdateLetter : ChoiceLetter
     {
-        private FeatureNews _news;
+        private readonly FeatureNews _news;
 
-        private Mod _mod;
+        private readonly Mod _mod;
 
         public FeatureUpdateLetter()
         {
